@@ -1,0 +1,1203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Software Factory</title>
+<style>
+  :root {
+    --bg: #14151b;
+    --panel: #1a1c24;
+    --card: #20222c;
+    --card-hover: #252835;
+    --line: #2b2e3b;
+    --text: #e4e5ea;
+    --muted: #868ba0;
+    --faint: #5b6075;
+    --active: #8be9fd;
+    --pass: #50fa7b;
+    --changes: #ffb86c;
+    --human: #ff79c6;
+    --merged: #bd93f9;
+    --tok: #f1fa8c;
+    --terminal-bg: #0d0e14;
+    --terminal-line: #1e202a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 270px;
+    transition: padding-bottom .2s ease;
+  }
+  body.dock-collapsed { padding-bottom: 50px; }
+  body.dock-maximized { padding-bottom: 65vh; }
+  button { font: inherit; color: inherit; }
+
+  /* Header */
+  header {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 20px 32px 14px; border-bottom: 1px solid var(--line);
+  }
+  .header-main {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .header-commands {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .cmd-item {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 3px 9px; color: var(--muted); cursor: pointer; user-select: all;
+    transition: all .15s ease;
+  }
+  .cmd-item:hover {
+    background: var(--card-hover); border-color: var(--active); color: var(--text);
+  }
+  .cmd-item.copied {
+    border-color: var(--pass); color: var(--pass); background: color-mix(in srgb, var(--pass) 12%, transparent);
+  }
+  .cmd-item code { font-family: inherit; font-size: inherit; }
+
+  .header-metrics {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .metric-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11.5px; padding: 4px 10px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--muted);
+  }
+  .metric-chip.tok { border-color: color-mix(in srgb, var(--tok) 30%, var(--line)); color: var(--text); }
+  .metric-chip.tok .val { color: var(--tok); font-weight: 600; }
+  .metric-chip.tok .sub { color: var(--faint); font-size: 10.5px; }
+  .metric-chip.agents { border-color: color-mix(in srgb, var(--active) 30%, var(--line)); }
+  .metric-chip.agents.active { color: var(--active); }
+  .metric-chip .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--faint);
+  }
+  .metric-chip.agents.active .dot {
+    background: var(--active); box-shadow: 0 0 8px var(--active);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .status { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .status .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--pass); margin-right: 6px; vertical-align: 1px;
+  }
+  .status.error { color: var(--human); }
+  .status.error .dot { background: var(--human); }
+  .banner {
+    margin: 12px 32px 0; padding: 10px 14px; border: 1px solid var(--human);
+    border-radius: 8px; color: var(--human); font-family: var(--mono); font-size: 12px;
+  }
+
+  /* Board */
+  .board {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px;
+    padding: 20px 32px 40px; align-items: start;
+  }
+  .col { min-width: 0; }
+  .col-head {
+    display: flex; align-items: center; gap: 8px; padding: 0 2px 10px;
+    border-bottom: 1px solid var(--line); margin-bottom: 12px; position: relative;
+  }
+  .col-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+  .col-head .who { font-size: 11px; color: var(--faint); font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col-head .count {
+    margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .col:not(:last-child):not(:nth-last-child(2)) .col-head::after {
+    content: "›"; position: absolute; right: -10px; top: -2px; color: var(--faint); font-size: 16px;
+  }
+  .col.human .col-head { border-bottom-color: color-mix(in srgb, var(--human) 55%, transparent); }
+  .col.human h2 { color: var(--human); }
+  .col.merged-col h2 { color: var(--merged); }
+  .empty { color: var(--faint); font-size: 12px; padding: 4px 2px; }
+
+  /* Cards */
+  .card {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 12px 10px; margin-bottom: 10px;
+    transition: background .15s, border-color .15s, transform .15s;
+  }
+  .card:hover { background: var(--card-hover); transform: translateY(-1px); }
+  .card:focus-visible { outline: 2px solid var(--active); outline-offset: 2px; }
+  .card.live { border-color: color-mix(in srgb, var(--active) 35%, var(--line)); }
+  .card.human {
+    border-color: var(--human);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--human) 40%, transparent),
+                0 8px 24px -12px color-mix(in srgb, var(--human) 60%, transparent);
+  }
+  .card.merged { opacity: .78; }
+  .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .num { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .card-top .num { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pulse {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--active);
+    animation: pulse 1.6s ease-in-out infinite; flex: none;
+  }
+  .flag {
+    margin-left: auto; font-size: 10px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--human); white-space: nowrap;
+  }
+  .feature { font-size: 13px; line-height: 1.4; margin: 0 0 6px; }
+  .card-meta {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 4px;
+  }
+  .branch {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tok-badge {
+    display: inline-flex; align-items: center; gap: 3px; font-family: var(--mono);
+    font-size: 10.5px; color: var(--tok); background: color-mix(in srgb, var(--tok) 12%, transparent);
+    padding: 1px 6px; border-radius: 4px; flex: none;
+  }
+  .card-agents {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
+  }
+  .agent-pill {
+    display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono);
+    font-size: 10px; color: var(--active); background: color-mix(in srgb, var(--active) 12%, transparent);
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .agent-pill .mini-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--active);
+    animation: pulse 1.4s infinite;
+  }
+  .rounds { margin-top: 10px; display: grid; gap: 5px; }
+  .round { display: flex; align-items: center; gap: 4px; }
+  .round .r { font-family: var(--mono); font-size: 10px; color: var(--faint); width: 20px; }
+  .chip {
+    flex: 1; text-align: center; font-family: var(--mono); font-size: 10px;
+    padding: 2px 0; border-radius: 4px; border: 1px dashed var(--faint); color: var(--faint);
+  }
+  .chip.wait { animation: breathe 1.6s ease-in-out infinite; }
+  .chip.PASS {
+    border: 1px solid transparent; color: var(--pass);
+    background: color-mix(in srgb, var(--pass) 14%, transparent);
+  }
+  .chip.CHANGES {
+    border: 1px solid transparent; color: var(--changes);
+    background: color-mix(in srgb, var(--changes) 16%, transparent);
+  }
+  .chip.bad { border: 1px solid var(--human); color: var(--human); }
+  .hint {
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10.5px; color: var(--muted); line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .pulse, .chip.wait, .agent-pill .mini-dot { animation: none; } }
+
+  /* Persistent Live Console Dock */
+  .console-dock {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--terminal-bg); border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; height: 260px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+    transition: height .2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body.dock-collapsed .console-dock { height: 38px; }
+  body.dock-maximized .console-dock { height: 62vh; }
+
+  .dock-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--terminal-line);
+    min-height: 38px; user-select: none;
+  }
+  .dock-left { display: flex; align-items: center; gap: 10px; }
+  .dock-title {
+    font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+    letter-spacing: 0.02em; text-transform: uppercase; color: var(--text);
+  }
+  .dock-pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--faint);
+  }
+  .dock-pulse.live {
+    background: var(--pass); box-shadow: 0 0 8px var(--pass);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .dock-status-tag {
+    font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 4px;
+    background: var(--card); color: var(--muted);
+  }
+  .dock-status-tag.active { color: var(--active); background: color-mix(in srgb, var(--active) 15%, transparent); }
+  .dock-tok-tag {
+    font-family: var(--mono); font-size: 11px; color: var(--tok);
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .dock-tabs {
+    display: flex; align-items: center; gap: 4px; overflow-x: auto; max-width: 50%;
+  }
+  .dock-tab {
+    font-family: var(--mono); font-size: 11.5px; padding: 3px 9px; border-radius: 5px;
+    background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer;
+    white-space: nowrap; display: flex; align-items: center; gap: 6px;
+  }
+  .dock-tab:hover { background: var(--card); color: var(--text); }
+  .dock-tab.active {
+    background: var(--card-hover); color: var(--text); border-color: var(--line);
+    font-weight: 500;
+  }
+  .dock-tab .t-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--pass);
+  }
+
+  .dock-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .dock-btn {
+    background: none; border: 1px solid var(--line); border-radius: 5px;
+    padding: 3px 8px; color: var(--muted); cursor: pointer; font-size: 11px;
+    display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono);
+  }
+  .dock-btn:hover { color: var(--text); background: var(--card); border-color: var(--muted); }
+  .auto-scroll-label {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
+  }
+  .auto-scroll-label input { cursor: pointer; accent-color: var(--active); margin: 0; }
+
+  .dock-body {
+    flex: 1; overflow: hidden; position: relative; display: flex; flex-direction: column;
+  }
+  .terminal {
+    flex: 1; overflow-y: auto; padding: 12px 18px 18px; font-family: var(--mono);
+    font-size: 12px; line-height: 1.6; color: #d6deeb; background: var(--terminal-bg);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .log-line { margin: 0 0 2px; }
+  .log-line.hl-agent { color: var(--active); font-weight: 600; }
+  .log-line.hl-pass { color: var(--pass); }
+  .log-line.hl-warn { color: var(--changes); }
+  .log-line.hl-err { color: var(--human); }
+  .log-line.hl-tok { color: var(--tok); }
+  .log-time { color: var(--faint); margin-right: 6px; }
+  .log-tag {
+    display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 11px;
+    margin-right: 6px; background: color-mix(in srgb, var(--active) 15%, transparent);
+    color: var(--active);
+  }
+  .log-tag.spec-writer { color: #bd93f9; background: color-mix(in srgb, #bd93f9 15%, transparent); }
+  .log-tag.builder { color: #8be9fd; background: color-mix(in srgb, #8be9fd 15%, transparent); }
+  .log-tag.reviewer-security { color: #ff79c6; background: color-mix(in srgb, #ff79c6 15%, transparent); }
+  .log-tag.reviewer-code { color: #50fa7b; background: color-mix(in srgb, #50fa7b 15%, transparent); }
+  .log-tag.reviewer-ui { color: #ffb86c; background: color-mix(in srgb, #ffb86c 15%, transparent); }
+  .log-tag.reviewer-ux { color: #f1fa8c; background: color-mix(in srgb, #f1fa8c 15%, transparent); }
+  .log-tag.approver { color: #bd93f9; background: color-mix(in srgb, #bd93f9 15%, transparent); }
+
+  /* Drawer */
+  .scrim {
+    position: fixed; inset: 0; background: rgba(5, 6, 10, .6);
+    opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 120;
+  }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(960px, 100vw);
+    background: var(--panel); border-left: 1px solid var(--line);
+    display: grid; grid-template-rows: auto 1fr; transform: translateX(100%);
+    transition: transform .25s ease; z-index: 130;
+  }
+  .open .scrim { opacity: 1; pointer-events: auto; }
+  .open .drawer { transform: none; }
+  .d-head { padding: 18px 24px 14px; border-bottom: 1px solid var(--line); position: relative; }
+  .d-head .top-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .d-head .num { font-size: 12px; }
+  .d-head h3 { margin: 2px 40px 6px 0; font-size: 16px; font-weight: 600; line-height: 1.35; }
+  .d-head .drawer-meta-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 6px;
+  }
+  .close {
+    position: absolute; top: 16px; right: 16px; width: 32px; height: 32px;
+    border-radius: 8px; border: 1px solid var(--line); background: none; cursor: pointer;
+    color: var(--muted); font-size: 18px; line-height: 1;
+  }
+  .close:hover { color: var(--text); border-color: var(--muted); }
+  .d-body { display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
+  .files { border-right: 1px solid var(--line); padding: 14px 10px; overflow-y: auto; }
+  .files .group {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--faint); margin: 14px 8px 5px;
+  }
+  .files .group:first-child { margin-top: 0; }
+  .file {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  .file:hover { background: var(--card); color: var(--text); }
+  .file.on { background: var(--card-hover); color: var(--text); }
+  .file .rn { display: none; }
+  .file .v { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex: none; }
+  .v.good { background: var(--pass); } .v.warn { background: var(--changes); } .v.stop { background: var(--human); }
+  .v.log-icon { background: var(--tok); }
+  .v.live-agent { background: var(--active); animation: pulse 1.4s infinite; }
+  .doc { overflow-y: auto; padding: 22px 28px 60px; min-width: 0; }
+
+  /* Token Widget inside Drawer */
+  .tok-widget {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; margin-bottom: 20px;
+  }
+  .tok-widget-head {
+    display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px;
+  }
+  .tok-widget-head h4 {
+    margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted);
+  }
+  .tok-total-big { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--tok); }
+  .tok-bar {
+    height: 6px; border-radius: 3px; background: var(--line); display: flex; overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .tok-bar-seg { height: 100%; }
+  .tok-legend {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px 12px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .tok-legend-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .tok-legend-key { display: flex; align-items: center; gap: 5px; }
+  .tok-swatch { width: 6px; height: 6px; border-radius: 2px; }
+
+  /* Rendered markdown */
+  .md { max-width: 720px; line-height: 1.65; }
+  .md h1, .md h2, .md h3, .md h4 { line-height: 1.3; margin: 1.6em 0 .5em; }
+  .md h1 { font-size: 20px; } .md h2 { font-size: 15px; } .md h3 { font-size: 14px; color: var(--muted); }
+  .md > :first-child { margin-top: 0; }
+  .md p, .md ul, .md ol, .md blockquote, .md pre, .md table { margin: 0 0 .9em; }
+  .md ul, .md ol { padding-left: 1.3em; }
+  .md li { margin: .2em 0; }
+  .md li.task { list-style: none; margin-left: -1.3em; }
+  .md li.task::before { content: "☐"; margin-right: .5em; color: var(--faint); }
+  .md li.task.done::before { content: "☑"; color: var(--pass); }
+  .md code {
+    font-family: var(--mono); font-size: 12px; background: var(--card);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .md pre {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto;
+  }
+  .md pre code { background: none; padding: 0; }
+  .md blockquote { border-left: 2px solid var(--line); padding-left: 12px; color: var(--muted); }
+  .md a { color: var(--active); }
+  .md table { border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
+  .md th, .md td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+  .verdict {
+    display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 6px; margin-bottom: 14px;
+  }
+  .verdict + * { margin-top: .4em; }
+  .verdict.good { color: var(--pass); background: color-mix(in srgb, var(--pass) 14%, transparent); }
+  .verdict.warn { color: var(--changes); background: color-mix(in srgb, var(--changes) 16%, transparent); }
+  .verdict.stop { color: var(--human); background: color-mix(in srgb, var(--human) 16%, transparent); }
+  .note { color: var(--faint); font-size: 13px; }
+
+  footer {
+    padding: 0 32px 32px; font-family: var(--mono); font-size: 11px; color: var(--faint);
+    display: flex; gap: 20px; flex-wrap: wrap;
+  }
+
+  @media (max-width: 1100px) {
+    .board { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 28px; }
+    .col-head::after { display: none; }
+  }
+  @media (max-width: 640px) {
+    header { padding: 18px 16px 8px; }
+    .banner { margin: 12px 16px 0; }
+    .board { grid-template-columns: 1fr; padding: 16px 16px 32px; }
+    footer { padding: 0 16px 24px; }
+    .d-head { padding: 16px; }
+    .d-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .files {
+      border-right: 0; border-bottom: 1px solid var(--line); display: flex; gap: 4px;
+      overflow-x: auto; padding: 8px;
+    }
+    .files .group { display: none; }
+    .file { width: auto; white-space: nowrap; }
+    .file .rn { display: inline; white-space: pre; }
+    .doc { padding: 18px 16px 48px; }
+    .console-dock { height: 210px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-main">
+    <div class="header-left">
+      <h1>Software factory</h1>
+      <div class="header-metrics">
+        <div class="metric-chip tok" id="token-chip" title="Total token usage across all jobs">
+          <span>🪙</span>
+          <span>Tokens: <strong class="val" id="total-tokens">0k</strong></span>
+          <span class="sub" id="token-breakdown">(in: 0k · out: 0k)</span>
+        </div>
+        <div class="metric-chip agents" id="agents-chip">
+          <span class="dot"></span>
+          <span id="active-agents-text">0 agents active</span>
+        </div>
+      </div>
+    </div>
+    <div class="status" id="status">connecting…</div>
+  </div>
+  <div class="header-commands">
+    <span class="cmd-item" data-copy="/factory <feature>" title="Click to copy"><code>/factory &lt;feature&gt;</code></span>
+    <span class="cmd-item" data-copy="/factory next" title="Click to copy"><code>/factory next</code></span>
+    <span class="cmd-item" data-copy="/factory approve <job-id>" title="Click to copy"><code>/factory approve &lt;job-id&gt;</code></span>
+    <span class="cmd-item" data-copy="/factory rework <job-id> <note>" title="Click to copy"><code>/factory rework &lt;job-id&gt; &lt;note&gt;</code></span>
+  </div>
+</header>
+<div id="banner"></div>
+<main class="board" id="board"></main>
+
+
+<!-- Persistent Live Agent Console Dock -->
+<aside class="console-dock" id="console-dock" aria-label="Live Agent Console">
+  <div class="dock-header" id="dock-header">
+    <div class="dock-left">
+      <span class="dock-title">
+        <span class="dock-pulse" id="dock-pulse"></span>
+        Live Agent Output
+      </span>
+      <span class="dock-status-tag" id="dock-status-tag">Idle</span>
+      <span class="dock-tok-tag" id="dock-tok-tag"></span>
+    </div>
+    <div class="dock-tabs" id="dock-tabs">
+      <button class="dock-tab active" data-agent-tab="all">
+        <span class="t-dot"></span>All Active Logs
+      </button>
+    </div>
+    <div class="dock-actions">
+      <label class="auto-scroll-label" title="Automatically scroll terminal to latest output">
+        <input type="checkbox" id="auto-scroll-chk" checked>
+        <span>Auto-scroll</span>
+      </label>
+      <button class="dock-btn" id="dock-size-toggle" title="Collapse / Expand console">▲</button>
+      <button class="dock-btn" id="dock-max-toggle" title="Maximize console">⛶</button>
+    </div>
+  </div>
+  <div class="dock-body">
+    <div class="terminal" id="terminal-content">Waiting for active factory agents...</div>
+  </div>
+</aside>
+
+<div id="overlay">
+  <div class="scrim" data-close></div>
+  <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title">
+    <div class="d-head">
+      <div class="top-meta">
+        <div class="num" id="d-num"></div>
+        <div class="tok-badge" id="d-tok-badge" style="display:none;"></div>
+      </div>
+      <h3 id="d-title"></h3>
+      <div class="drawer-meta-bar">
+        <div class="branch" id="d-branch"></div>
+      </div>
+      <button class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="d-body">
+      <nav class="files" id="d-files"></nav>
+      <article class="doc">
+        <div id="d-tok-widget"></div>
+        <div class="md" id="d-doc"></div>
+      </article>
+    </div>
+  </aside>
+</div>
+
+<script>
+const POLL_MS = 2000
+const STAGES = [
+  { key: 'spec', label: 'Spec', who: 'spec-writer · opus' },
+  { key: 'build', label: 'Build', who: 'builder · opus' },
+  { key: 'review', label: 'Review', who: 'sec · ux · ui · code' },
+  { key: 'approve', label: 'Approve', who: 'approver · opus' },
+  { key: 'merged', label: 'Merged', who: 'main', cls: 'merged-col' },
+  { key: 'needs-human', label: 'Needs human', who: 'approve · rework', cls: 'human' },
+]
+const LIVE = new Set(['spec', 'build', 'review', 'approve'])
+const REVIEWERS = [['security', 'sec'], ['ux', 'ux'], ['ui', 'ui'], ['code', 'code']]
+const AGENT_COLORS = {
+  'spec-writer': '#bd93f9',
+  'builder': '#8be9fd',
+  'reviewer-security': '#ff79c6',
+  'reviewer-code': '#50fa7b',
+  'reviewer-ui': '#ffb86c',
+  'reviewer-ux': '#f1fa8c',
+  'approver': '#bd93f9'
+}
+
+const $ = (id) => document.getElementById(id)
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+let jobs = []
+let lastRender = ''
+const roundCache = new Map() // "<job>/<n>" -> verdicts of a finished round
+let openJobId = null
+let openPath = null
+let openText = null
+
+// Live Console State
+let selectedAgentTab = 'all'
+let dockState = 'normal' // 'normal', 'collapsed', 'maximized'
+const logCache = new Map() // url -> text
+
+function formatNum(n) {
+  if (n === null || n === undefined) return '0'
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
+  return String(n)
+}
+
+async function fetchText(url) {
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`)
+  return res.text()
+}
+
+// ---- Board & Metrics -----------------------------------------------------
+
+function verdictOf(text) {
+  const m = text.split('\n')[0].trim().match(/^VERDICT:\s*(PASS|CHANGES)$/)
+  return m ? m[1] : 'invalid'
+}
+
+// Earlier rounds aren't on the board; their verdicts come from the review files.
+async function pastRounds(job) {
+  const rounds = []
+  for (let n = 1; n < job.round; n++) {
+    const key = `${job.id}/${n}`
+    if (!roundCache.has(key)) {
+      const verdicts = {}
+      await Promise.all(REVIEWERS.map(async ([k]) => {
+        try {
+          verdicts[k] = verdictOf(await fetchText(`jobs/${job.id}/round-${n}/review-${k}.md`))
+        } catch {
+          verdicts[k] = 'missing'
+        }
+      }))
+      if (Object.values(verdicts).every((v) => v === 'PASS' || v === 'CHANGES')) {
+        roundCache.set(key, verdicts)
+      } else {
+        rounds.push(verdicts)
+        continue
+      }
+    }
+    rounds.push(roundCache.get(key))
+  }
+  return rounds
+}
+
+function chips(n, verdicts, waiting) {
+  const cells = REVIEWERS.map(([k, short]) => {
+    const v = verdicts[k]
+    const cls = v === 'PASS' || v === 'CHANGES' ? v : v === 'pending' ? (waiting ? 'wait' : '') : 'bad'
+    const label = v === 'missing' || v === 'invalid' ? `${short}?` : short
+    return `<span class="chip ${cls}" title="${k}: ${esc(v)}">${label}</span>`
+  }).join('')
+  return `<div class="round"><span class="r">R${n}</span>${cells}</div>`
+}
+
+function getActiveAgents(job) {
+  if (job.active_agents && Array.isArray(job.active_agents)) {
+    return job.active_agents
+  }
+  // Fallback inferred active agent from stage
+  if (!LIVE.has(job.stage)) return []
+  if (job.stage === 'spec') return [{ name: 'spec-writer', status: 'running' }]
+  if (job.stage === 'build') return [{ name: 'builder', status: 'running' }]
+  if (job.stage === 'approve') return [{ name: 'approver', status: 'running' }]
+  if (job.stage === 'review') {
+    const pending = []
+    REVIEWERS.forEach(([k]) => {
+      if (!job.reviews || job.reviews[k] === 'pending') {
+        pending.push({ name: `reviewer-${k}`, status: 'running' })
+      }
+    })
+    return pending.length ? pending : [{ name: 'reviewer-security', status: 'running' }]
+  }
+  return []
+}
+
+function card(job, past) {
+  const live = LIVE.has(job.stage)
+  const human = job.stage === 'needs-human'
+  const activeAgents = live ? getActiveAgents(job) : []
+  const rows = past.map((v, i) => chips(i + 1, v, false))
+  if (job.round > 0) rows.push(chips(job.round, job.reviews || {}, job.stage === 'review'))
+  const [num, ...slug] = job.id.split('-')
+  const tokCount = job.tokens?.total ? formatNum(job.tokens.total) : null
+
+  return `
+    <button class="card ${live ? 'live' : ''} ${human ? 'human' : ''} ${job.stage === 'merged' ? 'merged' : ''}"
+            data-job="${esc(job.id)}">
+      <div class="card-top">
+        ${live ? '<span class="pulse" aria-label="running"></span>' : ''}
+        <span class="num">${esc(num)} · ${esc(slug.join('-'))}</span>
+        ${human ? '<span class="flag">your call</span>' : ''}
+      </div>
+      <p class="feature">${esc(job.feature)}</p>
+      <div class="card-meta">
+        <div class="branch">${esc(job.branch)}</div>
+        ${tokCount ? `<span class="tok-badge" title="Total token usage">🪙 ${tokCount} tok</span>` : ''}
+      </div>
+      ${activeAgents.length > 0 ? `
+        <div class="card-agents">
+          ${activeAgents.map((a) => `<span class="agent-pill"><span class="mini-dot"></span>${esc(a.name)}</span>`).join('')}
+        </div>` : ''}
+      ${rows.length ? `<div class="rounds">${rows.join('')}</div>` : ''}
+      ${human ? `<div class="hint">/factory approve ${esc(job.id)}<br>/factory rework ${esc(job.id)} …</div>` : ''}
+    </button>`
+}
+
+async function render() {
+  const problems = []
+  const byStage = Object.fromEntries(STAGES.map((s) => [s.key, []]))
+  const pasts = await Promise.all(jobs.map(pastRounds))
+  
+  let totalTokens = 0
+  let promptTokens = 0
+  let completionTokens = 0
+  let allActiveAgents = []
+
+  jobs.forEach((job, i) => {
+    if (!byStage[job.stage]) {
+      problems.push(`Job ${job.id} has unknown stage "${job.stage}"`)
+    } else {
+      byStage[job.stage].push(card(job, pasts[i]))
+    }
+
+    if (job.tokens) {
+      totalTokens += (job.tokens.total || 0)
+      promptTokens += (job.tokens.prompt || 0)
+      completionTokens += (job.tokens.completion || 0)
+    }
+
+    if (LIVE.has(job.stage)) {
+      const active = getActiveAgents(job)
+      active.forEach((ag) => allActiveAgents.push({ job, ...ag }))
+    }
+  })
+
+  // Update Global Header Metrics
+  $('total-tokens').textContent = formatNum(totalTokens)
+  $('token-breakdown').textContent = `(in: ${formatNum(promptTokens)} · out: ${formatNum(completionTokens)})`
+  
+  const agentsChip = $('agents-chip')
+  if (allActiveAgents.length > 0) {
+    agentsChip.className = 'metric-chip agents active'
+    $('active-agents-text').textContent = `${allActiveAgents.length} agent${allActiveAgents.length > 1 ? 's' : ''} active`
+  } else {
+    agentsChip.className = 'metric-chip agents'
+    $('active-agents-text').textContent = '0 agents (idle)'
+  }
+
+  // Update Console Dock Header State
+  const dockPulse = $('dock-pulse')
+  const dockStatus = $('dock-status-tag')
+  const dockTok = $('dock-tok-tag')
+  if (allActiveAgents.length > 0) {
+    dockPulse.className = 'dock-pulse live'
+    dockStatus.className = 'dock-status-tag active'
+    dockStatus.textContent = `${allActiveAgents.length} Running`
+    dockTok.textContent = `🪙 ${formatNum(totalTokens)} tok`
+  } else {
+    dockPulse.className = 'dock-pulse'
+    dockStatus.className = 'dock-status-tag'
+    dockStatus.textContent = 'Idle'
+    dockTok.textContent = totalTokens > 0 ? `🪙 ${formatNum(totalTokens)} tok` : ''
+  }
+
+  // Render Columns
+  const html = STAGES.map((s) => `
+    <section class="col ${s.cls || ''}">
+      <div class="col-head">
+        <h2>${s.label}</h2><span class="who">${s.who}</span>
+        <span class="count">${byStage[s.key].length || ''}</span>
+      </div>
+      ${byStage[s.key].reverse().join('') || '<div class="empty">—</div>'}
+    </section>`).join('')
+  const banner = problems.map((p) => `<div class="banner">${esc(p)}</div>`).join('')
+  if (html + banner !== lastRender) {
+    lastRender = html + banner
+    $('board').innerHTML = html
+    $('banner').innerHTML = banner
+  }
+
+  // Update Live Console Tabs and Content
+  await updateConsole(allActiveAgents)
+}
+
+// ---- Live Agent Console Dock ---------------------------------------------
+
+async function updateConsole(activeAgents) {
+  const tabsContainer = $('dock-tabs')
+  const terminal = $('terminal-content')
+
+  // Collect available logs from live jobs or fallback to latest completed jobs
+  const liveJobs = jobs.filter((j) => LIVE.has(j.stage))
+  const targetJobs = liveJobs.length > 0 ? liveJobs : jobs.slice(-2)
+
+  const availableTabs = [{ id: 'all', label: 'All Active Logs', live: activeAgents.length > 0 }]
+  const logSources = []
+
+  for (const j of targetJobs) {
+    const isLive = LIVE.has(j.stage)
+    // Common logs to check
+    const agentRoles = ['builder', 'reviewer-security', 'reviewer-code', 'reviewer-ui', 'reviewer-ux', 'spec-writer', 'approver']
+    for (const r of agentRoles) {
+      const path = `jobs/${j.id}/logs/${r}.log`
+      const combinedPath = `jobs/${j.id}/logs/combined.log`
+      logSources.push({ jobId: j.id, agent: r, url: path, combinedUrl: combinedPath, live: isLive })
+    }
+  }
+
+  // Create tabs for running agents
+  activeAgents.forEach((ag) => {
+    const tabId = `${ag.job.id}_${ag.name}`
+    availableTabs.push({
+      id: tabId,
+      label: `${ag.job.id.split('-')[0]} · ${ag.name}`,
+      live: true,
+      jobId: ag.job.id,
+      agent: ag.name
+    })
+  })
+
+  // If no live agents, show recent job combined logs
+  if (activeAgents.length === 0 && targetJobs.length > 0) {
+    targetJobs.forEach((j) => {
+      availableTabs.push({
+        id: `recent_${j.id}`,
+        label: `${j.id.split('-')[0]} log`,
+        live: false,
+        jobId: j.id,
+        agent: 'combined'
+      })
+    })
+  }
+
+  // Render Tabs
+  const currentTabExists = availableTabs.some((t) => t.id === selectedAgentTab)
+  if (!currentTabExists) selectedAgentTab = availableTabs[0].id
+
+  tabsContainer.innerHTML = availableTabs.map((t) => `
+    <button class="dock-tab ${t.id === selectedAgentTab ? 'active' : ''}" data-agent-tab="${esc(t.id)}">
+      ${t.live ? '<span class="t-dot"></span>' : ''}${esc(t.label)}
+    </button>
+  `).join('')
+
+  // Fetch Output for current tab
+  let outputText = ''
+  if (selectedAgentTab === 'all') {
+    // Combine logs from target jobs
+    const lines = []
+    for (const j of targetJobs) {
+      try {
+        const text = await fetchText(`jobs/${j.id}/logs/combined.log`)
+        text.split('\n').filter(Boolean).forEach((l) => lines.push(`[${j.id.split('-')[0]}] ${l}`))
+      } catch {
+        // Fallback to reading individual logs
+        for (const r of ['spec-writer', 'builder', 'reviewer-security']) {
+          try {
+            const txt = await fetchText(`jobs/${j.id}/logs/${r}.log`)
+            txt.split('\n').filter(Boolean).forEach((l) => lines.push(`[${j.id.split('-')[0]}] ${l}`))
+          } catch {}
+        }
+      }
+    }
+    outputText = lines.join('\n') || (activeAgents.length > 0 ? 'Streaming active agent output...' : 'No active agent sessions running. Factory idle.')
+  } else {
+    const selectedTab = availableTabs.find((t) => t.id === selectedAgentTab)
+    if (selectedTab && selectedTab.jobId) {
+      const fileToFetch = selectedTab.agent === 'combined'
+        ? `jobs/${selectedTab.jobId}/logs/combined.log`
+        : `jobs/${selectedTab.jobId}/logs/${selectedTab.agent}.log`
+      try {
+        outputText = await fetchText(fileToFetch)
+      } catch {
+        outputText = `Waiting for output from ${selectedTab.agent}...`
+      }
+    }
+  }
+
+  renderTerminal(terminal, outputText)
+}
+
+function formatTerminalLine(line) {
+  let cls = 'log-line'
+  if (/PASS|STATUS:\s*READY|APPROVE/i.test(line)) cls += ' hl-pass'
+  else if (/CHANGES|WARN/i.test(line)) cls += ' hl-warn'
+  else if (/FAIL|ERROR|BLOCKED|ESCALATE/i.test(line)) cls += ' hl-err'
+  else if (/token usage|tokens/i.test(line)) cls += ' hl-tok'
+
+  // Tag styling
+  let formatted = esc(line)
+  formatted = formatted.replace(/^\[(\d{2}:\d{2}:\d{2})\]/, '<span class="log-time">[$1]</span>')
+  formatted = formatted.replace(/\[([\w-]+)\]/g, (match, tag) => {
+    const agentCls = AGENT_COLORS[tag] ? tag : ''
+    return `<span class="log-tag ${agentCls}">[${tag}]</span>`
+  })
+
+  return `<div class="${cls}">${formatted}</div>`
+}
+
+function renderTerminal(el, text) {
+  const shouldAutoScroll = $('auto-scroll-chk').checked
+  const lines = text.split('\n')
+  el.innerHTML = lines.map(formatTerminalLine).join('')
+  if (shouldAutoScroll) {
+    el.scrollTop = el.scrollHeight
+  }
+}
+
+// Dock controls
+$('dock-size-toggle').addEventListener('click', () => {
+  if (document.body.classList.contains('dock-collapsed')) {
+    document.body.classList.remove('dock-collapsed')
+    $('dock-size-toggle').textContent = '▲'
+  } else {
+    document.body.classList.add('dock-collapsed')
+    document.body.classList.remove('dock-maximized')
+    $('dock-size-toggle').textContent = '▼'
+  }
+})
+
+$('dock-max-toggle').addEventListener('click', () => {
+  document.body.classList.remove('dock-collapsed')
+  document.body.classList.toggle('dock-maximized')
+  $('dock-size-toggle').textContent = '▲'
+})
+
+document.addEventListener('click', (e) => {
+  const tabEl = e.target.closest('[data-agent-tab]')
+  if (tabEl) {
+    selectedAgentTab = tabEl.dataset.agentTab
+    updateConsole(jobs.filter((j) => LIVE.has(j.stage)).flatMap(getActiveAgents))
+  }
+})
+
+async function poll() {
+  const status = $('status')
+  try {
+    jobs = await loadJobs()
+    await render()
+    if (openJobId) await refreshDrawer()
+    status.className = 'status'
+    status.innerHTML = `<span class="dot"></span>jobs/ · ${new Date().toLocaleTimeString()}`
+  } catch (err) {
+    status.className = 'status error'
+    status.innerHTML = `<span class="dot"></span>${esc(err.message)}`
+  }
+}
+
+// Each orchestrator session writes only its own jobs/<id>/job.json.
+async function loadJobs() {
+  const doc = new DOMParser().parseFromString(await fetchText('jobs/'), 'text/html')
+  const ids = [...doc.querySelectorAll('a')]
+    .map((a) => decodeURIComponent(a.getAttribute('href')))
+    .filter((h) => h.endsWith('/'))
+    .map((h) => h.slice(0, -1))
+    .sort()
+  return Promise.all(ids.map(async (id) => JSON.parse(await fetchText(`jobs/${id}/job.json`))))
+}
+
+// ---- Drawer --------------------------------------------------------------
+
+async function listFiles(dir) {
+  try {
+    const doc = new DOMParser().parseFromString(await fetchText(dir), 'text/html')
+    const hrefs = [...doc.querySelectorAll('a')].map((a) => decodeURIComponent(a.getAttribute('href')))
+    const out = []
+    for (const h of hrefs) {
+      if (h.endsWith('/')) out.push(...(await listFiles(dir + h)).map((f) => h + f))
+      else if (h.endsWith('.md') || h.endsWith('.log')) out.push(h)
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function fileRank(path) {
+  const order = ['spec.md', 'build.md', 'decision.md']
+  if (order.includes(path)) return [0, order.indexOf(path), path]
+  const round = path.match(/^round-(\d+)\/review-(\w+)\.md$/)
+  if (round) return [2, Number(round[1]) * 10 + REVIEWERS.findIndex(([k]) => k === round[2]), path]
+  if (path.startsWith('logs/')) return [3, 0, path]
+  return [1, 0, path] // rework-<k>.md and anything else
+}
+
+function sortFiles(files) {
+  return files.sort((a, b) => {
+    const [x, y] = [fileRank(a), fileRank(b)]
+    return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2])
+  })
+}
+
+function tone(first) {
+  if (/^(VERDICT:\s*PASS|APPROVE|STATUS:\s*READY)$/.test(first)) return 'good'
+  if (/^VERDICT:\s*CHANGES$/.test(first)) return 'warn'
+  if (/^(ESCALATE|STATUS:\s*BLOCKED)$/.test(first)) return 'stop'
+  return null
+}
+
+const firstLines = new Map()
+
+async function refreshDrawer() {
+  const job = jobs.find((j) => j.id === openJobId)
+  if (!job) return
+  $('d-num').textContent = `${job.id} · ${job.stage}${job.round ? ` · round ${job.round}` : ''}`
+  $('d-title').textContent = job.feature
+  $('d-branch').textContent = job.branch
+
+  // Token Badge in Drawer
+  const dTokBadge = $('d-tok-badge')
+  if (job.tokens && job.tokens.total) {
+    dTokBadge.style.display = 'inline-flex'
+    dTokBadge.innerHTML = `🪙 ${formatNum(job.tokens.total)} tokens <span style="opacity:0.6;font-size:10px;margin-left:4px;">(${formatNum(job.tokens.prompt)} in · ${formatNum(job.tokens.completion)} out)</span>`
+  } else {
+    dTokBadge.style.display = 'none'
+  }
+
+  // Token Breakdown Widget
+  const dTokWidget = $('d-tok-widget')
+  if (job.tokens && job.tokens.by_agent) {
+    const byAgent = job.tokens.by_agent
+    const total = job.tokens.total || 1
+    const segs = Object.entries(byAgent).map(([ag, stats]) => {
+      const pct = Math.max(3, Math.round((stats.total / total) * 100))
+      const col = AGENT_COLORS[ag] || '#bd93f9'
+      return `<div class="tok-bar-seg" style="width:${pct}%;background:${col};" title="${ag}: ${formatNum(stats.total)} (${pct}%)"></div>`
+    }).join('')
+
+    const legend = Object.entries(byAgent).map(([ag, stats]) => {
+      const col = AGENT_COLORS[ag] || '#bd93f9'
+      return `
+        <div class="tok-legend-item">
+          <span class="tok-legend-key"><span class="tok-swatch" style="background:${col};"></span>${esc(ag)}</span>
+          <strong>${formatNum(stats.total)}</strong>
+        </div>`
+    }).join('')
+
+    dTokWidget.innerHTML = `
+      <div class="tok-widget">
+        <div class="tok-widget-head">
+          <h4>Token Usage Breakdown</h4>
+          <span class="tok-total-big">Total: ${formatNum(job.tokens.total)}</span>
+        </div>
+        <div class="tok-bar">${segs}</div>
+        <div class="tok-legend">${legend}</div>
+      </div>`
+  } else {
+    dTokWidget.innerHTML = ''
+  }
+
+  const base = `jobs/${job.id}/`
+  let files = sortFiles(await listFiles(base))
+  
+  // Ensure common logs are included if directory listing didn't find them
+  const fallbackLogs = ['logs/spec-writer.log', 'logs/builder.log', 'logs/reviewer-security.log', 'logs/combined.log']
+  for (const fl of fallbackLogs) {
+    if (!files.includes(fl)) {
+      try {
+        await fetchText(base + fl)
+        files.push(fl)
+      } catch {}
+    }
+  }
+  files = sortFiles(files)
+
+  if (!openPath || !files.includes(openPath)) openPath = files[0] || null
+
+  let text = null
+  if (openPath) {
+    try {
+      text = await fetchText(base + openPath)
+      firstLines.set(base + openPath, text.split('\n')[0].trim())
+    } catch {
+      text = null
+    }
+  }
+
+  let group = null
+  $('d-files').innerHTML = files.map((f) => {
+    let g = 'Job Documents'
+    if (f.startsWith('round-')) {
+      g = f.split('/')[0].replace('round-', 'Round ')
+    } else if (f.startsWith('logs/')) {
+      g = 'Agent Logs'
+    }
+    const head = g !== group ? `<div class="group">${esc(g)}</div>` : ''
+    group = g
+
+    let name = esc(f)
+    if (f.startsWith('round-')) {
+      const round = f.match(/^round-(\d+)\//)
+      name = round ? `<span class="rn">R${round[1]} </span>${esc(f.split('/')[1].replace(/^review-|\.md$/g, ''))}` : name
+    } else if (f.startsWith('logs/')) {
+      name = esc(f.replace('logs/', ''))
+    }
+
+    const isLog = f.endsWith('.log')
+    const t = isLog ? 'log-icon' : tone(firstLines.get(base + f) || '')
+    return `${head}<button class="file ${f === openPath ? 'on' : ''}" data-file="${esc(f)}">
+      <span class="v ${t || ''}"></span>${name}</button>`
+  }).join('') || '<div class="empty">No files yet.</div>'
+
+  if (text !== openText) {
+    openText = text
+    if (text === null) {
+      $('d-doc').innerHTML = '<p class="note">No output written yet.</p>'
+    } else if (openPath && openPath.endsWith('.log')) {
+      $('d-doc').innerHTML = `<div class="terminal" style="border-radius:8px;padding:14px;border:1px solid var(--line);">${linesToTerminalHtml(text)}</div>`
+    } else {
+      $('d-doc').innerHTML = markdown(text)
+    }
+  }
+}
+
+function linesToTerminalHtml(text) {
+  return text.split('\n').map(formatTerminalLine).join('')
+}
+
+async function openDrawer(id) {
+  openJobId = id
+  openPath = null
+  openText = undefined
+  document.body.classList.add('open')
+  try {
+    await refreshDrawer()
+  } catch (err) {
+    $('d-doc').innerHTML = `<p class="note">${esc(err.message)}</p>`
+  }
+}
+
+function closeDrawer() {
+  openJobId = null
+  document.body.classList.remove('open')
+}
+
+document.addEventListener('click', (e) => {
+  const cmdEl = e.target.closest('[data-copy]')
+  if (cmdEl) {
+    const text = cmdEl.dataset.copy
+    if (navigator.clipboard) navigator.clipboard.writeText(text)
+    const origHtml = cmdEl.innerHTML
+    cmdEl.classList.add('copied')
+    cmdEl.innerHTML = '<code>copied!</code>'
+    setTimeout(() => {
+      cmdEl.classList.remove('copied')
+      cmdEl.innerHTML = origHtml
+    }, 1200)
+    return
+  }
+  const cardEl = e.target.closest('[data-job]')
+  if (cardEl) return openDrawer(cardEl.dataset.job)
+  const fileEl = e.target.closest('[data-file]')
+  if (fileEl) {
+    openPath = fileEl.dataset.file
+    openText = undefined
+    $('d-doc').parentElement.scrollTop = 0
+    return refreshDrawer()
+  }
+  if (e.target.closest('[data-close]')) closeDrawer()
+})
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer() })
+
+// ---- Markdown (just enough for the factory's files) ---------------------
+
+function inline(s) {
+  const codes = []
+  s = esc(s).replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`)
+  s = s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\(((?:https?:\/\/|\.{0,2}\/|#)[^)\s]*)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`)
+}
+
+function markdown(src) {
+  const lines = src.replace(/\r/g, '').split('\n')
+  let i = 0
+  let html = ''
+  const first = (lines[0] || '').trim()
+  const t = tone(first)
+  if (t) { html += `<div class="verdict ${t}">${esc(first)}</div>`; i = 1 }
+
+  const isList = (l) => /^\s*([-*+]|\d+\.)\s+/.test(l)
+  const isBlockStart = (l) => /^(#{1,6}\s|```|\s*>|\|)/.test(l) || isList(l)
+
+  while (i < lines.length) {
+    const line = lines[i]
+    if (!line.trim()) { i++; continue }
+
+    if (line.startsWith('```')) {
+      const body = []
+      i++
+      while (i < lines.length && !lines[i].startsWith('```')) body.push(lines[i++])
+      i++
+      html += `<pre><code>${esc(body.join('\n'))}</code></pre>`
+      continue
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/)
+    if (h) { const n = Math.min(h[1].length, 4); html += `<h${n}>${inline(h[2])}</h${n}>`; i++; continue }
+
+    if (/^\s*>/.test(line)) {
+      const body = []
+      while (i < lines.length && /^\s*>/.test(lines[i])) body.push(lines[i++].replace(/^\s*>\s?/, ''))
+      html += `<blockquote>${inline(body.join(' '))}</blockquote>`
+      continue
+    }
+    if (line.startsWith('|')) {
+      const rows = []
+      while (i < lines.length && lines[i].startsWith('|')) rows.push(lines[i++])
+      const cells = (r) => r.replace(/^\||\|$/g, '').split('|').map((c) => inline(c.trim()))
+      const body = rows.filter((r) => !/^\|[\s:|-]+\|$/.test(r))
+      html += '<table>' + body.map((r, n) => `<tr>${cells(r).map((c) => n ? `<td>${c}</td>` : `<th>${c}</th>`).join('')}</tr>`).join('') + '</table>'
+      continue
+    }
+    if (isList(line)) {
+      const ordered = /^\s*\d+\./.test(line)
+      const items = []
+      while (i < lines.length && (isList(lines[i]) || (/^\s{2,}\S/.test(lines[i]) && items.length))) {
+        const l = lines[i++]
+        if (isList(l)) items.push({ indent: l.match(/^\s*/)[0].length, text: l.replace(/^\s*([-*+]|\d+\.)\s+/, '') })
+        else items[items.length - 1].text += ' ' + l.trim()
+      }
+      const lis = items.map(({ indent, text }) => {
+        const task = text.match(/^\[([ xX])\]\s+(.*)$/)
+        const style = indent ? ` style="margin-left:${indent * 0.6}em"` : ''
+        return task
+          ? `<li class="task ${task[1] === ' ' ? '' : 'done'}"${style}>${inline(task[2])}</li>`
+          : `<li${style}>${inline(text)}</li>`
+      }).join('')
+      html += ordered ? `<ol>${lis}</ol>` : `<ul>${lis}</ul>`
+      continue
+    }
+    const para = []
+    while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i])) para.push(lines[i++])
+    html += `<p>${inline(para.join(' '))}</p>`
+  }
+  return html
+}
+
+poll()
+setInterval(poll, POLL_MS)
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# OS & editor artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Factory runtime artifacts
+/factory/jobs/*
+!/factory/jobs/.gitkeep
+/factory/worktrees/
+
+# Scratch & logs
+/scratch/
+*.log
