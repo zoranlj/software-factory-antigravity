@@ -87,9 +87,9 @@ Every job executes in its own isolated Git worktree:
     "completion": 8940,
     "total": 62140,
     "by_agent": {
-      "spec-writer": { "prompt": 12420, "completion": 1840, "total": 14260 },
-      "builder": { "prompt": 24150, "completion": 3920, "total": 28070 },
-      "reviewer-security": { "prompt": 4120, "completion": 650, "total": 4770 }
+      "spec-writer": { "prompt": 12420, "completion": 1840, "total": 14260, "model": "gemini-3.8-flash" },
+      "builder": { "prompt": 24150, "completion": 3920, "total": 28070, "model": "gemini-3.8-flash" },
+      "reviewer-security": { "prompt": 4120, "completion": 650, "total": 4770, "model": "gemini-3.8-flash" }
     }
   }
 }

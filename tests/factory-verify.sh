@@ -53,6 +53,7 @@ assert "factory/dashboard.html exists" test -f "factory/dashboard.html"
 assert "factory/dashboard.html contains valid HTML" grep -q "<title>Software Factory</title>" "factory/dashboard.html"
 assert "factory/dashboard.html contains Live Agent Output console" grep -q "Live Agent Output" "factory/dashboard.html"
 assert "factory/dashboard.html contains token stats" grep -q "total-tokens" "factory/dashboard.html"
+assert "factory/dashboard.html contains agent model badge" grep -q "tok-model" "factory/dashboard.html"
 
 echo ""
 echo "4. Testing job.json Serialization, Token Stats, and Agent Logs..."
@@ -81,8 +82,8 @@ cat << 'JSON' > "$TEST_JOB_DIR/job.json"
     "completion": 2500,
     "total": 14500,
     "by_agent": {
-      "builder": { "prompt": 8000, "completion": 1800, "total": 9800 },
-      "reviewer-security": { "prompt": 4000, "completion": 700, "total": 4700 }
+      "builder": { "prompt": 8000, "completion": 1800, "total": 9800, "model": "gemini-3.8-flash" },
+      "reviewer-security": { "prompt": 4000, "completion": 700, "total": 4700, "model": "gemini-3.8-flash" }
     }
   }
 }
@@ -127,6 +128,7 @@ MD
 
 assert "job.json is valid JSON" node -e "const j = JSON.parse(require('fs').readFileSync('$TEST_JOB_DIR/job.json', 'utf8')); if (j.stage !== 'review') process.exit(1);"
 assert "job.json contains token statistics" node -e "const j = JSON.parse(require('fs').readFileSync('$TEST_JOB_DIR/job.json', 'utf8')); if (!j.tokens || j.tokens.total !== 14500) process.exit(1);"
+assert "job.json contains agent model" node -e "const j = JSON.parse(require('fs').readFileSync('$TEST_JOB_DIR/job.json', 'utf8')); if (!j.tokens.by_agent.builder.model) process.exit(1);"
 assert "job.json contains active_agents array" node -e "const j = JSON.parse(require('fs').readFileSync('$TEST_JOB_DIR/job.json', 'utf8')); if (!Array.isArray(j.active_agents) || j.active_agents[0].name !== 'reviewer-security') process.exit(1);"
 assert "agent logs directory and combined.log exist" test -f "$TEST_JOB_DIR/logs/combined.log"
 assert "build.md first line is STATUS: READY" bash -c "head -n 1 '$TEST_JOB_DIR/build.md' | grep -q 'STATUS: READY'"

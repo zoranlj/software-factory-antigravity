@@ -365,12 +365,29 @@
   }
   .tok-bar-seg { height: 100%; }
   .tok-legend {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px 12px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px;
     font-family: var(--mono); font-size: 11px; color: var(--muted);
   }
-  .tok-legend-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-  .tok-legend-key { display: flex; align-items: center; gap: 5px; }
-  .tok-swatch { width: 6px; height: 6px; border-radius: 2px; }
+  .tok-legend-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 3px 0;
+  }
+  .tok-legend-key {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;
+  }
+  .tok-swatch { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+  .tok-model {
+    display: inline-block; font-size: 9.5px; padding: 1px 5px; border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line);
+    color: var(--active); font-weight: 500; letter-spacing: 0.02em;
+  }
+  .tok-vals {
+    display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; white-space: nowrap;
+  }
+  .tok-vals strong { color: var(--text); }
+  .tok-io {
+    font-size: 10px; color: var(--muted); opacity: 0.85;
+  }
 
   /* Rendered markdown */
   .md { max-width: 720px; line-height: 1.65; }
@@ -987,10 +1004,22 @@ async function refreshDrawer() {
 
     const legend = Object.entries(byAgent).map(([ag, stats]) => {
       const col = AGENT_COLORS[ag] || '#bd93f9'
+      const modelTag = stats.model ? `<span class="tok-model" title="Model: ${esc(stats.model)}">${esc(stats.model)}</span>` : ''
+      const hasIo = (stats.prompt !== undefined || stats.completion !== undefined)
+      const ioText = hasIo
+        ? `<span class="tok-io">(in: ${formatNum(stats.prompt || 0)} · out: ${formatNum(stats.completion || 0)})</span>`
+        : ''
       return `
         <div class="tok-legend-item">
-          <span class="tok-legend-key"><span class="tok-swatch" style="background:${col};"></span>${esc(ag)}</span>
-          <strong>${formatNum(stats.total)}</strong>
+          <span class="tok-legend-key">
+            <span class="tok-swatch" style="background:${col};"></span>
+            <span>${esc(ag)}</span>
+            ${modelTag}
+          </span>
+          <span class="tok-vals">
+            <strong>${formatNum(stats.total || 0)}</strong>
+            ${ioText}
+          </span>
         </div>`
     }).join('')
 
