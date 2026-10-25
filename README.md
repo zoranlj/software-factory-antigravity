@@ -16,6 +16,8 @@ feature / issue → spec-writer → builder → [security, ux, ui, code] → WAI
                                             merge to main ◄─ APPROVE ─ approver ─ ESCALATE → needs-human
 ```
 
+![Software Factory Dashboard & Live Agent Console](factory/demo_assets/Screenshot.png)
+
 ---
 
 ## Key Features & Antigravity Adaptations
@@ -67,6 +69,7 @@ software-factory-antigravity/
 ├── factory/                       # Visual dashboard & runtime scaffolding
 │   ├── dashboard.html             # Standalone Kanban board, Live Console & Token Tracker
 │   ├── backlog.md                 # Queue for /factory next
+│   ├── demo_assets/               # Screenshots and media assets
 │   └── jobs/                      # Runtime job state (gitignored)
 ├── templates/
 │   └── AGENTS.md                  # Ground truth template for consumer repositories
