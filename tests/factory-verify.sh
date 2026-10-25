@@ -54,6 +54,7 @@ assert "factory/dashboard.html contains valid HTML" grep -q "<title>Software Fac
 assert "factory/dashboard.html contains Live Agent Output console" grep -q "Live Agent Output" "factory/dashboard.html"
 assert "factory/dashboard.html contains token stats" grep -q "total-tokens" "factory/dashboard.html"
 assert "factory/dashboard.html contains agent model badge" grep -q "tok-model" "factory/dashboard.html"
+assert "factory/dashboard.html contains cost calculation" grep -q "calcCost" "factory/dashboard.html"
 
 echo ""
 echo "4. Testing job.json Serialization, Token Stats, and Agent Logs..."

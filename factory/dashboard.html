@@ -365,7 +365,7 @@
   }
   .tok-bar-seg { height: 100%; }
   .tok-legend {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px;
     font-family: var(--mono); font-size: 11px; color: var(--muted);
   }
   .tok-legend-item {
@@ -387,6 +387,11 @@
   .tok-vals strong { color: var(--text); }
   .tok-io {
     font-size: 10px; color: var(--muted); opacity: 0.85;
+  }
+  .tok-cost-sep { opacity: 0.4; margin: 0 4px; }
+  .tok-cost-big { color: var(--pass); font-weight: 600; margin-left: 4px; }
+  .tok-agent-cost {
+    font-size: 10px; color: var(--pass); font-weight: 600; margin-left: 2px;
   }
 
   /* Rendered markdown */
@@ -457,10 +462,12 @@
     <div class="header-left">
       <h1>Software factory</h1>
       <div class="header-metrics">
-        <div class="metric-chip tok" id="token-chip" title="Total token usage across all jobs">
+        <div class="metric-chip tok" id="token-chip" title="Total token usage and estimated USD cost across all jobs ($0.75/1M in, $3.75/1M out)">
           <span>🪙</span>
           <span>Tokens: <strong class="val" id="total-tokens">0k</strong></span>
           <span class="sub" id="token-breakdown">(in: 0k · out: 0k)</span>
+          <span class="tok-cost-sep">·</span>
+          <span class="sub">Cost: <strong class="val" id="total-cost" style="color:var(--pass);">$0.00</strong></span>
         </div>
         <div class="metric-chip agents" id="agents-chip">
           <span class="dot"></span>
@@ -580,6 +587,21 @@ function formatNum(n) {
   return String(n)
 }
 
+const INPUT_PRICE_PER_M = 0.75
+const OUTPUT_PRICE_PER_M = 3.75
+
+function calcCost(promptTokens, completionTokens) {
+  const p = promptTokens || 0
+  const c = completionTokens || 0
+  return (p * INPUT_PRICE_PER_M + c * OUTPUT_PRICE_PER_M) / 1000000
+}
+
+function formatCost(cost) {
+  if (cost === null || cost === undefined || isNaN(cost) || cost <= 0) return '$0.00'
+  if (cost < 0.01) return `$${cost.toFixed(3)}`
+  return `$${cost.toFixed(2)}`
+}
+
 async function fetchText(url) {
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`)
@@ -658,6 +680,9 @@ function card(job, past) {
   if (job.round > 0) rows.push(chips(job.round, job.reviews || {}, job.stage === 'review'))
   const [num, ...slug] = job.id.split('-')
   const tokCount = job.tokens?.total ? formatNum(job.tokens.total) : null
+  const tokCost = (job.tokens && (job.tokens.prompt || job.tokens.completion || job.tokens.total))
+    ? formatCost(calcCost(job.tokens.prompt, job.tokens.completion))
+    : null
 
   return `
     <button class="card ${live ? 'live' : ''} ${human ? 'human' : ''} ${job.stage === 'merged' ? 'merged' : ''}"
@@ -670,7 +695,7 @@ function card(job, past) {
       <p class="feature">${esc(job.feature)}</p>
       <div class="card-meta">
         <div class="branch">${esc(job.branch)}</div>
-        ${tokCount ? `<span class="tok-badge" title="Total token usage">🪙 ${tokCount} tok</span>` : ''}
+        ${tokCount ? `<span class="tok-badge" title="Total token usage and estimated cost">🪙 ${tokCount} (${tokCost})</span>` : ''}
       </div>
       ${activeAgents.length > 0 ? `
         <div class="card-agents">
@@ -711,8 +736,10 @@ async function render() {
   })
 
   // Update Global Header Metrics
+  const totalCost = calcCost(promptTokens, completionTokens)
   $('total-tokens').textContent = formatNum(totalTokens)
   $('token-breakdown').textContent = `(in: ${formatNum(promptTokens)} · out: ${formatNum(completionTokens)})`
+  $('total-cost').textContent = formatCost(totalCost)
   
   const agentsChip = $('agents-chip')
   if (allActiveAgents.length > 0) {
@@ -731,12 +758,12 @@ async function render() {
     dockPulse.className = 'dock-pulse live'
     dockStatus.className = 'dock-status-tag active'
     dockStatus.textContent = `${allActiveAgents.length} Running`
-    dockTok.textContent = `🪙 ${formatNum(totalTokens)} tok`
+    dockTok.textContent = `🪙 ${formatNum(totalTokens)} tok · ${formatCost(totalCost)}`
   } else {
     dockPulse.className = 'dock-pulse'
     dockStatus.className = 'dock-status-tag'
     dockStatus.textContent = 'Idle'
-    dockTok.textContent = totalTokens > 0 ? `🪙 ${formatNum(totalTokens)} tok` : ''
+    dockTok.textContent = totalTokens > 0 ? `🪙 ${formatNum(totalTokens)} tok · ${formatCost(totalCost)}` : ''
   }
 
   // Render Columns
@@ -985,8 +1012,9 @@ async function refreshDrawer() {
   // Token Badge in Drawer
   const dTokBadge = $('d-tok-badge')
   if (job.tokens && job.tokens.total) {
+    const jobCost = formatCost(calcCost(job.tokens.prompt, job.tokens.completion))
     dTokBadge.style.display = 'inline-flex'
-    dTokBadge.innerHTML = `🪙 ${formatNum(job.tokens.total)} tokens <span style="opacity:0.6;font-size:10px;margin-left:4px;">(${formatNum(job.tokens.prompt)} in · ${formatNum(job.tokens.completion)} out)</span>`
+    dTokBadge.innerHTML = `🪙 ${formatNum(job.tokens.total)} tokens <strong style="color:var(--pass);margin-left:6px;font-weight:600;">${jobCost}</strong> <span style="opacity:0.6;font-size:10px;margin-left:4px;">(${formatNum(job.tokens.prompt)} in · ${formatNum(job.tokens.completion)} out)</span>`
   } else {
     dTokBadge.style.display = 'none'
   }
@@ -1006,9 +1034,11 @@ async function refreshDrawer() {
       const col = AGENT_COLORS[ag] || '#bd93f9'
       const modelTag = stats.model ? `<span class="tok-model" title="Model: ${esc(stats.model)}">${esc(stats.model)}</span>` : ''
       const hasIo = (stats.prompt !== undefined || stats.completion !== undefined)
+      const agentCost = hasIo ? formatCost(calcCost(stats.prompt, stats.completion)) : null
       const ioText = hasIo
         ? `<span class="tok-io">(in: ${formatNum(stats.prompt || 0)} · out: ${formatNum(stats.completion || 0)})</span>`
         : ''
+      const costBadge = agentCost ? `<span class="tok-agent-cost">${agentCost}</span>` : ''
       return `
         <div class="tok-legend-item">
           <span class="tok-legend-key">
@@ -1018,16 +1048,18 @@ async function refreshDrawer() {
           </span>
           <span class="tok-vals">
             <strong>${formatNum(stats.total || 0)}</strong>
+            ${costBadge}
             ${ioText}
           </span>
         </div>`
     }).join('')
 
+    const jobCost = formatCost(calcCost(job.tokens.prompt, job.tokens.completion))
     dTokWidget.innerHTML = `
       <div class="tok-widget">
         <div class="tok-widget-head">
-          <h4>Token Usage Breakdown</h4>
-          <span class="tok-total-big">Total: ${formatNum(job.tokens.total)}</span>
+          <h4>Token Usage & Cost Breakdown</h4>
+          <span class="tok-total-big">Total: ${formatNum(job.tokens.total)} <span class="tok-cost-big">(${jobCost})</span></span>
         </div>
         <div class="tok-bar">${segs}</div>
         <div class="tok-legend">${legend}</div>
