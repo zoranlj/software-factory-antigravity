@@ -6,6 +6,4 @@ Items are claimed sequentially from top to bottom. Once claimed by an autonomous
 
 ## Queue
 
-- [ ] Add dark mode toggle to header
-- [ ] Implement responsive mobile navigation drawer
-- [ ] Add automated input sanitization helper
+- [x] Issue #1: Token usage refactor → 001-token-usage-refactor
