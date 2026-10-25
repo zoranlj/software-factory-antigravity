@@ -156,7 +156,11 @@ To verify that the factory skill, dashboard, schemas, and worktree lifecycles co
 
 ---
 
-## Acknowledgments & Credits
+## Credits & Attribution
 
-- Created and maintained for Google Antigravity by **Zoran**.
-- Original Software Factory architecture, agent persona loop, and file contract concepts designed by **Alexander Galea** ([ZazenCodes](https://github.com/zazencodes)).
+This project is an adaptation of the [Software Factory for Claude Code](https://github.com/zazencodes/zazencodes-season-3) 
+originally created by **Alexander Galea ([ZazenCodes](https://youtube.com/@zazencodes))**.
+
+- Original architecture and concept: Alexander Galea (ZazenCodes)
+- Ported, restructured, and optimized for **Google Antigravity** by **Zoran Ljubinković** ([@zoranlj](https://github.com/zoranlj)).
+- Licensed under the [MIT License](LICENSE) in compliance with upstream terms.
