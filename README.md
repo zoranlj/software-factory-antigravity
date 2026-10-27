@@ -85,7 +85,7 @@ software-factory-antigravity/
 Install the `/factory` skill globally to use in any project across Antigravity:
 
 ```bash
-git clone https://github.com/<your-username>/software-factory-antigravity.git
+git clone https://github.com/zoranlj/software-factory-antigravity.git
 cd software-factory-antigravity
 ./install.sh --global
 ```
