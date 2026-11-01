@@ -15,3 +15,8 @@ Thumbs.db
 # Scratch & logs
 /scratch/
 *.log
+
+# Remotion build & dependencies
+remotion/node_modules/
+remotion/out/
+.remotion/
