@@ -5,6 +5,7 @@
   "scripts": {
     "start": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts SoftwareFactoryDemo ../factory/demo_assets/SoftwareFactoryWalkthrough.mp4",
+    "render:blueprint": "remotion render src/index.ts BlueprintExplainer ../factory/demo_assets/SoftwareFactoryBlueprintExplainer.mp4",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
