@@ -59,10 +59,10 @@ When `headless-run.sh` invokes your command, it automatically exports:
 3. **Name:** `FACTORY_AGENT_CMD`
 4. **Value:** Your headless Antigravity CLI invocation (or wrapper script) that executes the `/factory` skill against `$FACTORY_WORKTREE` and writes artifacts into `$FACTORY_JOB_DIR`.
 
-Example via `gh` CLI:
+Example via `gh` CLI (using `@google/gemini-cli`, which is installed automatically in `.github/workflows/factory-headless.yml`):
 ```bash
 gh variable set FACTORY_AGENT_CMD \
-  --body 'agy run --headless --cwd "$FACTORY_WORKTREE" --prompt "Execute /factory in headless mode for Issue #$FACTORY_ISSUE_NUMBER using job dir $FACTORY_JOB_DIR"'
+  --body 'cd "$FACTORY_WORKTREE" && gemini --approval-mode=yolo --skip-trust -p "Read AGENTS.md, ARCHITECTURE.md, CONVENTIONS.md, TESTING_HARNESS.md, and .agents/skills/factory/SKILL.md. Execute the full /factory loop in headless mode for Issue #$FACTORY_ISSUE_NUMBER (issue body at $FACTORY_ISSUE_FILE). Write spec.md, build.md, round-1/review-*.md, decision.md, and update job.json in $FACTORY_JOB_DIR. Commit all code changes on branch $FACTORY_BRANCH inside $FACTORY_WORKTREE and ensure ./tests/factory-verify.sh passes. Do NOT merge to main."'
 ```
 
 ### Add Model / CLI Authentication Secrets
