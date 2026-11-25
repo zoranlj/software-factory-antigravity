@@ -128,6 +128,8 @@ if [[ "$DRY_RUN" == "true" ]]; then
 fi
 
 mkdir -p "$JOB_DIR/logs" "$REPO_ROOT/factory/worktrees"
+cp "$ISSUE_FILE" "$JOB_DIR/issue.md"
+ISSUE_FILE="$JOB_DIR/issue.md"
 
 cat << JSON > "$JOB_DIR/job.json"
 {
@@ -186,6 +188,12 @@ export FACTORY_ISSUE_FILE="$ISSUE_FILE"
 export FACTORY_ISSUE_NUMBER="${ISSUE_NUMBER:-}"
 
 bash -c "$AGENT_CMD"
+
+COMMIT_COUNT="$(git -C "$WORKTREE" rev-list --count "$BASE_BRANCH..HEAD")"
+if [[ "$COMMIT_COUNT" -eq 0 ]]; then
+  echo "❌ Headless agent exited without creating any commits on $BRANCH (ahead of $BASE_BRANCH)." >&2
+  exit 1
+fi
 
 echo "5️⃣  Opening Level 4 Pull Request (awaiting human approval)..."
 PR_BODY_FILE="$(mktemp)"
