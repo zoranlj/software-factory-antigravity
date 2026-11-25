@@ -59,7 +59,7 @@ When UI changes touch `factory/dashboard.html`:
    ```
 2. Verify HTTP 200 and expected DOM markers (or run headless browser checks via `browser_subagent` / Playwright):
    ```bash
-   curl -fsS http://localhost:5199/dashboard.html | grep -q "<title>Software Factory</title>"
+   curl -fsS http://localhost:5199/dashboard.html | grep -q "<title>Zoran's Software factory</title>"
    ```
 3. Always terminate the background server before exiting:
    ```bash
