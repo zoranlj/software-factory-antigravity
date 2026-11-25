@@ -1,0 +1,89 @@
+name: Headless Software Factory (Level 4)
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "GitHub issue number to run through the headless factory"
+        required: true
+        type: string
+      dry_run:
+        description: "Run preflight validation and DAG check only (no PR created)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  factory-headless:
+    name: Headless Pipeline Agent
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'factory-ready'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      FACTORY_AGENT_CMD: ${{ vars.FACTORY_AGENT_CMD }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve issue number
+        id: issue
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "number=${{ inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run headless factory pipeline
+        id: run
+        continue-on-error: true
+        run: |
+          DRY_FLAG=""
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            DRY_FLAG="--dry-run"
+          fi
+          set +e
+          ./factory/scripts/headless-run.sh --issue "${{ steps.issue.outputs.number }}" $DRY_FLAG
+          EXIT_CODE=$?
+          set -e
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          if [[ "$EXIT_CODE" -eq 2 ]]; then
+            gh issue comment "${{ steps.issue.outputs.number }}" --body "⏸️ **Headless Factory paused:** This issue has unresolved \`Depends-On\` dependencies. Re-apply \`factory-ready\` once blockers are closed."
+            exit 0
+          fi
+          exit "$EXIT_CODE"
+
+      - name: Publish Level 4 KPI Summary
+        if: always()
+        run: |
+          node factory/scripts/kpi-report.mjs factory/jobs --markdown >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload Factory Job Artifacts & Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-job-${{ steps.issue.outputs.number }}
+          path: factory/jobs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail job if runner errored
+        if: steps.run.outputs.exit_code != '0' && steps.run.outputs.exit_code != '2'
+        run: |
+          gh issue comment "${{ steps.issue.outputs.number }}" --body "❌ **Headless Factory escalated:** Pipeline exited with code \`${{ steps.run.outputs.exit_code }}\`. Inspect the uploaded CI artifacts for \`spec.md\`, \`build.md\`, and agent logs." || true
+          exit 1

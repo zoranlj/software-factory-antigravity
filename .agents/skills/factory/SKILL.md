@@ -95,10 +95,14 @@ Every job executes in its own isolated Git worktree:
 }
 ```
 
-- `stage`: `spec`, `build`, `review`, `approve`, `merged`, `needs-human`.
+- `stage`: `spec`, `build`, `review`, `approve`, `pr-open`, `merged`, `needs-human`.
+- `mode`: `local` (interactive Level 3) or `headless` (CI pipeline Level 4; stops at `pr-open` for human approval).
 - `active_agents`: Array of agents currently executing; lights up live console indicators and tabs.
 - `reviews`: Updated immediately as each review completes (`pending`, `PASS`, `CHANGES`).
 - `tokens`: Prompt, completion, and total tokens tracked globally and per agent.
+- `kpi`: Level 4 metrics (`tests_passed_first_try`, `tests_passed_final`, `pr_generated`, `human_review_seconds`).
+
+> **Machine-Readable Ground Truth:** Before planning or editing code, every agent MUST read `AGENTS.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`, and `TESTING_HARNESS.md` when present in the repository root.
 
 
 ---
@@ -180,30 +184,36 @@ Read first line of `build.md`:
    - `APPROVE`: Proceed to **Merge**.
    - `ESCALATE`: Update `job.json`: `stage: "needs-human"`. Notify user.
 
-#### Merge
-1. Check that the main checkout is clean:
-   ```bash
-   git status --porcelain -- . ':!factory/backlog.md'
-   ```
-   If uncommitted changes exist, update `job.json` to `stage: "needs-human"` and instruct user to run `/factory approve <job-id>` once clean.
-2. Execute merge:
-   ```bash
-   git merge --no-ff factory/<job-id> -m "Merge factory/<job-id>"
-   git worktree remove <worktree>
-   git branch -d factory/<job-id>
-   ```
-3. If an `issue_number` was associated:
-   ```bash
-   gh issue comment <issue_number> --body "✅ Factory job <job-id> completed successfully. Acceptance criteria verified. Merged to main in $(git rev-parse --short HEAD)."
-   gh issue close <issue_number> --comment "Resolved by autonomous factory run <job-id>."
-   ```
-4. Update `job.json`: `stage: "merged"`. Notify user that the feature is live on `main`.
+#### Merge (Local Mode) / Open PR (Headless Level 4 Mode)
+- **If `mode == "headless"` (Level 4 Pipeline Gate):**
+  1. Never merge directly to `main`.
+  2. Push `factory/<job-id>` to `origin` and open a Pull Request using `node factory/scripts/build-pr-body.mjs factory/jobs/<job-id>` for the PR body.
+  3. Record `pr_number`, `pr_url`, `timestamps.pr_opened_at`, `kpi.pr_generated = true`, and update `job.json` to `stage: "pr-open"`.
+  4. Stop and await human review and approval on the Pull Request.
+- **If `mode == "local"` (Level 3 Interactive Mode):**
+  1. Check that the main checkout is clean:
+     ```bash
+     git status --porcelain -- . ':!factory/backlog.md'
+     ```
+     If uncommitted changes exist, update `job.json` to `stage: "needs-human"` and instruct user to run `/factory approve <job-id>` once clean.
+  2. Execute merge:
+     ```bash
+     git merge --no-ff factory/<job-id> -m "Merge factory/<job-id>"
+     git worktree remove <worktree>
+     git branch -d factory/<job-id>
+     ```
+  3. If an `issue_number` was associated:
+     ```bash
+     gh issue comment <issue_number> --body "✅ Factory job <job-id> completed successfully. Acceptance criteria verified. Merged to main in $(git rev-parse --short HEAD)."
+     gh issue close <issue_number> --comment "Resolved by autonomous factory run <job-id>."
+     ```
+  4. Update `job.json`: `stage: "merged"`. Notify user that the feature is live on `main`.
 
 ---
 
 ### 2. `/factory next`
 1. Read `factory/backlog.md`.
-2. Locate the first unchecked item: `- [ ] <task>`.
+2. Locate the first unchecked item `- [ ] <task>` whose `Depends-On` references (if any) are all closed/resolved (verified via `node factory/scripts/check-dag.mjs`).
 3. Atomically claim it by updating the line in `factory/backlog.md` to:
    `- [x] <task> → claimed`
 4. Run `/factory <task>`. Once job ID is created, replace `claimed` with `<job-id>`.
@@ -214,11 +224,12 @@ Read first line of `build.md`:
 1. Check if `gh` CLI is installed and authenticated (`gh auth status`).
 2. Query open GitHub issues:
    ```bash
-   gh issue list --state open ${label:+--label "$label"} --json number,title
+   gh issue list --state open ${label:+--label "$label"} --json number,title,body
    ```
-3. For each issue not yet present in `factory/backlog.md`:
-   Append `- [ ] Issue #<num>: <title>` to `factory/backlog.md`.
-4. Report how many new issues were queued.
+3. Validate each issue against `node factory/scripts/validate-issue.mjs` and extract any `Depends-On:` references.
+4. For each issue not yet present in `factory/backlog.md`:
+   Append `- [ ] Issue #<num>: <title>` (plus `(Depends-On: ...)` if present) to `factory/backlog.md`.
+5. Report how many new issues were queued and how many failed SRI validation.
 
 ---
 

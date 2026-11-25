@@ -27,13 +27,23 @@ assert() {
 }
 
 echo ""
-echo "1. Checking Core Repository Files & Templates..."
+echo "1. Checking Core Repository Files & Level 4 Context Artifacts..."
 assert "install.sh exists and is executable" test -x "install.sh"
+assert "Root AGENTS.md exists" test -f "AGENTS.md"
+assert "Root ARCHITECTURE.md exists" test -f "ARCHITECTURE.md"
+assert "Root CONVENTIONS.md exists" test -f "CONVENTIONS.md"
+assert "Root TESTING_HARNESS.md exists" test -f "TESTING_HARNESS.md"
+assert "factory/schemas/job.schema.json is valid JSON" node -e "JSON.parse(require('fs').readFileSync('factory/schemas/job.schema.json', 'utf8'));"
 assert "templates/AGENTS.md exists" test -f "templates/AGENTS.md"
+assert "templates/ARCHITECTURE.md exists" test -f "templates/ARCHITECTURE.md"
+assert "templates/CONVENTIONS.md exists" test -f "templates/CONVENTIONS.md"
+assert "templates/TESTING_HARNESS.md exists" test -f "templates/TESTING_HARNESS.md"
 assert "templates/AGENTS.md defines dev server" grep -q "npm run dev" "templates/AGENTS.md"
 assert "templates/AGENTS.md defines validation commands" grep -q "npm test" "templates/AGENTS.md"
 assert ".gitignore exists" test -f ".gitignore"
 assert "factory/jobs/ is ignored in .gitignore" git check-ignore -q "factory/jobs/sample-job"
+assert "Shell script syntax check passes" bash -n install.sh tests/factory-verify.sh factory/scripts/headless-run.sh
+assert "Node script syntax check passes" bash -c "for f in factory/scripts/*.mjs; do node --check \"\$f\"; done"
 
 echo ""
 echo "2. Checking Agent Personas & Skill Definitions..."
@@ -170,13 +180,91 @@ assert "install.sh installs to target" ./install.sh --target "$TEST_TARGET_DIR" 
 assert "Target contains .agents/skills/factory/SKILL.md" test -f "$TEST_TARGET_DIR/.agents/skills/factory/SKILL.md"
 assert "Target contains factory/dashboard.html" test -f "$TEST_TARGET_DIR/factory/dashboard.html"
 assert "Target contains AGENTS.md" test -f "$TEST_TARGET_DIR/AGENTS.md"
+assert "Target contains ARCHITECTURE.md" test -f "$TEST_TARGET_DIR/ARCHITECTURE.md"
+assert "Target contains CONVENTIONS.md" test -f "$TEST_TARGET_DIR/CONVENTIONS.md"
+assert "Target contains TESTING_HARNESS.md" test -f "$TEST_TARGET_DIR/TESTING_HARNESS.md"
+assert "Target contains factory/schemas/job.schema.json" test -f "$TEST_TARGET_DIR/factory/schemas/job.schema.json"
+assert "Target contains .github/ISSUE_TEMPLATE/factory-sri.yml" test -f "$TEST_TARGET_DIR/.github/ISSUE_TEMPLATE/factory-sri.yml"
+assert "Target contains .github/workflows/factory-headless.yml" test -f "$TEST_TARGET_DIR/.github/workflows/factory-headless.yml"
 assert "Target .gitignore includes factory rules" grep -q "factory/jobs" "$TEST_TARGET_DIR/.gitignore"
 
 # Clean up installer test target
 rm -rf "$TEST_TARGET_DIR"
 
 echo ""
-echo "7. Checking GitHub CLI Integration..."
+echo "7. Testing Level 4 Headless Pipeline, SRI Validator, DAG Gate, PR & KPI Scripts..."
+assert ".github/ISSUE_TEMPLATE/factory-sri.yml exists" test -f ".github/ISSUE_TEMPLATE/factory-sri.yml"
+assert ".github/workflows/ci-verify.yml exists" test -f ".github/workflows/ci-verify.yml"
+assert ".github/workflows/factory-headless.yml exists" test -f ".github/workflows/factory-headless.yml"
+assert "factory/scripts/headless-run.sh is executable" test -x "factory/scripts/headless-run.sh"
+
+TMP_L4_DIR="$(mktemp -d)"
+cat << 'MD' > "$TMP_L4_DIR/valid-issue.md"
+# Add headless KPI reporter
+
+## Context
+Adds KPI reporting for Level 4 pipelines.
+
+## Acceptance Criteria
+- [ ] Given a jobs directory, when `kpi-report.mjs` runs, then it outputs JSON metrics.
+
+## Out of Scope
+- Do not modify `factory/dashboard.html`
+
+Depends-On: #41
+MD
+
+cat << 'MD' > "$TMP_L4_DIR/invalid-issue.md"
+# Vague issue
+Please make it better.
+MD
+
+assert "validate-issue.mjs passes on valid SRI issue" node factory/scripts/validate-issue.mjs --file "$TMP_L4_DIR/valid-issue.md" >/dev/null
+assert "validate-issue.mjs fails on invalid issue" bash -c "! node factory/scripts/validate-issue.mjs --file '$TMP_L4_DIR/invalid-issue.md' >/dev/null 2>&1"
+assert "check-dag.mjs passes when Depends-On is closed" node factory/scripts/check-dag.mjs --file "$TMP_L4_DIR/valid-issue.md" --closed "#41" >/dev/null
+assert "check-dag.mjs returns exit code 2 when Depends-On is open" bash -c "set +e; node factory/scripts/check-dag.mjs --file '$TMP_L4_DIR/valid-issue.md' --closed '' >/dev/null 2>&1; test \$? -eq 2"
+
+# Dry-run headless orchestrator on a dependency-free valid issue
+sed '/Depends-On:/d' "$TMP_L4_DIR/valid-issue.md" > "$TMP_L4_DIR/ready-issue.md"
+assert "headless-run.sh --dry-run passes preflight" ./factory/scripts/headless-run.sh --issue-file "$TMP_L4_DIR/ready-issue.md" --dry-run >/dev/null
+
+# Seed mock Level 4 job for PR body & KPI tests
+mkdir -p "$TMP_L4_DIR/jobs/002-headless-demo/round-1"
+cat << 'JSON' > "$TMP_L4_DIR/jobs/002-headless-demo/job.json"
+{
+  "id": "002-headless-demo",
+  "feature": "Headless KPI demo",
+  "mode": "headless",
+  "branch": "factory/002-headless-demo",
+  "stage": "pr-open",
+  "round": 1,
+  "issue_number": 42,
+  "pr_number": 99,
+  "reviews": { "security": "PASS", "ux": "PASS", "ui": "PASS", "code": "PASS" },
+  "tokens": { "prompt": 5000, "completion": 1000, "total": 6000 },
+  "timestamps": {
+    "started_at": "2026-11-25T10:00:00Z",
+    "pr_opened_at": "2026-11-25T10:05:00Z",
+    "merged_at": "2026-11-25T10:20:00Z"
+  },
+  "kpi": {
+    "tests_passed_first_try": true,
+    "tests_passed_final": true,
+    "pr_generated": true,
+    "human_review_seconds": 900
+  }
+}
+JSON
+echo "STATUS: READY" > "$TMP_L4_DIR/jobs/002-headless-demo/build.md"
+echo "APPROVE" > "$TMP_L4_DIR/jobs/002-headless-demo/decision.md"
+
+assert "build-pr-body.mjs generates Level 4 PR body with human gate" bash -c "node factory/scripts/build-pr-body.mjs '$TMP_L4_DIR/jobs/002-headless-demo' | grep -q 'Human Approval Gate'"
+assert "kpi-report.mjs computes 100% PR rate and 900s review time" node -e "const r = JSON.parse(require('child_process').execFileSync('node', ['factory/scripts/kpi-report.mjs', '$TMP_L4_DIR/jobs', '--json'], {encoding:'utf8'})); if (r.autonomous_pr_generation_rate_pct !== 100 || r.avg_human_review_seconds !== 900) process.exit(1);"
+
+rm -rf "$TMP_L4_DIR"
+
+echo ""
+echo "8. Checking GitHub CLI Integration..."
 if command -v gh >/dev/null 2>&1; then
   echo "  ℹ️  gh CLI is installed: $(gh --version | head -n 1)"
   assert "gh CLI executable" command -v gh

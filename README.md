@@ -22,6 +22,8 @@ feature / issue → spec-writer → builder → [security, ux, ui, code] → WAI
 
 ## Key Features & Antigravity Adaptations
 
+- **Level 4 Headless Pipeline Mode**: GitHub Actions workflow (`.github/workflows/factory-headless.yml`) triggered by `factory-ready` issues validates Single-Responsibility Issue (SRI) contracts, enforces `Depends-On` DAG dependencies, executes the factory headlessly, opens an audited Pull Request awaiting human approval, and publishes Level 4 KPI reports.
+- **Machine-Readable Ground Truth**: Ships root and template versions of `AGENTS.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`, `TESTING_HARNESS.md`, and `factory/schemas/job.schema.json`.
 - **Isolated Git Worktrees**: Every job builds and tests inside `factory/worktrees/<job-id>/` on dedicated `factory/<job-id>` branches without touching the main checkout.
 - **7 Specialized Agent Personas**: Mapped to native Antigravity primitives (`view_file`, `write_to_file`, `run_command`, `browser_subagent`).
 - **Native Browser Inspection**: Reviewers and builders use `browser_subagent` to visually test responsive UI layouts, animations, and user experience flows on dedicated ports.

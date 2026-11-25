@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Software Factory Documentation
+    url: https://github.com/zoranlj/software-factory-antigravity#readme
+    about: Read AGENTS.md, ARCHITECTURE.md, and CONVENTIONS.md before filing a headless issue.

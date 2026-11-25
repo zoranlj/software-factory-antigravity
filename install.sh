@@ -45,10 +45,14 @@ install_target() {
   cp -r "$SCRIPT_DIR/.agents/skills/factory/agents" "$target_abs/.agents/skills/factory/"
   echo "  ✅ Installed .agents/skills/factory"
 
-  # 2. Install factory dashboard and backlog
-  mkdir -p "$target_abs/factory/jobs"
+  # 2. Install factory dashboard, schemas, scripts, and backlog
+  mkdir -p "$target_abs/factory/jobs" "$target_abs/factory/schemas" "$target_abs/factory/scripts"
   touch "$target_abs/factory/jobs/.gitkeep"
   cp "$SCRIPT_DIR/factory/dashboard.html" "$target_abs/factory/dashboard.html"
+  cp "$SCRIPT_DIR/factory/schemas/job.schema.json" "$target_abs/factory/schemas/job.schema.json"
+  cp "$SCRIPT_DIR/factory/scripts/"* "$target_abs/factory/scripts/"
+  chmod +x "$target_abs/factory/scripts/headless-run.sh"
+  echo "  ✅ Installed factory dashboard, schemas, and Level 4 scripts"
   if [ ! -f "$target_abs/factory/backlog.md" ]; then
     cp "$SCRIPT_DIR/factory/backlog.md" "$target_abs/factory/backlog.md"
     echo "  ✅ Created factory/backlog.md"
@@ -56,12 +60,25 @@ install_target() {
     echo "  ℹ️  factory/backlog.md already exists, keeping existing"
   fi
 
-  # 3. Ground truth AGENTS.md
-  if [ ! -f "$target_abs/AGENTS.md" ]; then
-    cp "$SCRIPT_DIR/templates/AGENTS.md" "$target_abs/AGENTS.md"
-    echo "  ✅ Created template AGENTS.md in repo root"
-  else
-    echo "  ℹ️  AGENTS.md already exists, keeping existing"
+  # 3. Ground truth & Level 4 machine-readable context docs
+  for doc in AGENTS.md ARCHITECTURE.md CONVENTIONS.md TESTING_HARNESS.md; do
+    if [ ! -f "$target_abs/$doc" ]; then
+      cp "$SCRIPT_DIR/templates/$doc" "$target_abs/$doc"
+      echo "  ✅ Created template $doc in repo root"
+    else
+      echo "  ℹ️  $doc already exists, keeping existing"
+    fi
+  done
+
+  # 4. Level 4 GitHub Issue Templates & Headless Workflow
+  mkdir -p "$target_abs/.github/ISSUE_TEMPLATE" "$target_abs/.github/workflows"
+  if [ ! -f "$target_abs/.github/ISSUE_TEMPLATE/factory-sri.yml" ]; then
+    cp "$SCRIPT_DIR/.github/ISSUE_TEMPLATE/factory-sri.yml" "$target_abs/.github/ISSUE_TEMPLATE/factory-sri.yml"
+    echo "  ✅ Created .github/ISSUE_TEMPLATE/factory-sri.yml"
+  fi
+  if [ ! -f "$target_abs/.github/workflows/factory-headless.yml" ]; then
+    cp "$SCRIPT_DIR/.github/workflows/factory-headless.yml" "$target_abs/.github/workflows/factory-headless.yml"
+    echo "  ✅ Created .github/workflows/factory-headless.yml"
   fi
 
   # 4. Update .gitignore

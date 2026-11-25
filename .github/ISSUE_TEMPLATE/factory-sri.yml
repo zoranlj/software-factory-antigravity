@@ -1,0 +1,63 @@
+name: Factory Single-Responsibility Issue (Level 4 SRI)
+description: Outcome-oriented, atomic issue ready for headless Software Factory execution.
+title: "[Factory]: "
+labels: ["factory-candidate"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Level 4 Headless Agent Intake
+        Scope this issue to **1–3 files** verifiable in a single CI run. Add the `factory-ready` label once triaged to dispatch the headless pipeline.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Where this lives in the codebase and the concrete problem/outcome desired.
+      placeholder: |
+        Cite real file paths and current behavior.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Estimated Scope (Single-Responsibility Check)
+      description: Headless agents perform best on atomic units of value.
+      options:
+        - "Small (1–3 files, single CI run)"
+        - "Medium (4–6 files, consider splitting)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Executable checklist (`- [ ] ...`) or Gherkin (`Given / When / Then`) criteria that directly drive automated tests.
+      placeholder: |
+        - [ ] Given ..., when ..., then ...
+        - [ ] `./tests/factory-verify.sh` passes with zero errors
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: Explicit boundary constraints (what the agent MUST NOT touch).
+      placeholder: |
+        - Do not alter database schemas or `job.schema.json` required fields
+        - Do not add third-party npm dependencies
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Optional DAG blockers. List one per line using `Depends-On: #123` or `Depends-On: org/repo#456`. Leave blank if none.
+      placeholder: |
+        Depends-On: #41
+    validations:
+      required: false
