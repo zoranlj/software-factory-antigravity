@@ -180,6 +180,7 @@ if [[ -z "$AGENT_CMD" ]]; then
 fi
 
 export FACTORY_MODE="headless"
+export FACTORY_REPO_ROOT="$REPO_ROOT"
 export FACTORY_JOB_ID="$JOB_ID"
 export FACTORY_JOB_DIR="$JOB_DIR"
 export FACTORY_WORKTREE="$WORKTREE"

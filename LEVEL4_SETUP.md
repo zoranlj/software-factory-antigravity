@@ -59,10 +59,16 @@ When `headless-run.sh` invokes your command, it automatically exports:
 3. **Name:** `FACTORY_AGENT_CMD`
 4. **Value:** Your headless Antigravity CLI invocation (or wrapper script) that executes the `/factory` skill against `$FACTORY_WORKTREE` and writes artifacts into `$FACTORY_JOB_DIR`.
 
-Example via `gh` CLI (using `@google/gemini-cli` with automatic model fallback, installed automatically in `.github/workflows/factory-headless.yml`):
+Example via `gh` CLI (using `@google/gemini-cli` with fail-fast automatic model fallback via `factory/scripts/run-gemini-fallback.mjs`, which immediately switches to the next model on 429/503 instead of waiting for backoff retries):
 ```bash
 gh variable set FACTORY_AGENT_CMD \
-  --body 'cd "$FACTORY_WORKTREE" && PROMPT="You are the headless Software Factory agent running inside an already-provisioned worktree ($FACTORY_WORKTREE on branch $FACTORY_BRANCH) with job directory $FACTORY_JOB_DIR. Do NOT invoke headless-run.sh or /factory. Read AGENTS.md, ARCHITECTURE.md, CONVENTIONS.md, TESTING_HARNESS.md, .agents/skills/factory/SKILL.md, and the issue at $FACTORY_ISSUE_FILE. Directly perform the spec, build, review, and decision stages: write spec.md, build.md, round-1/review-{security,ux,ui,code}.md, decision.md, and update job.json in $FACTORY_JOB_DIR. Implement the requested code changes in $FACTORY_WORKTREE, ensure ./tests/factory-verify.sh passes, and git commit all changes on branch $FACTORY_BRANCH. Do NOT merge to main or push." && for m in gemini-3.8-flash gemini-3-flash-preview gemini-2.5-flash gemini-2.5-flash-lite; do echo "Trying model: $m"; gemini -m "$m" --approval-mode=yolo --skip-trust --include-directories "$FACTORY_JOB_DIR" -p "$PROMPT" && exit 0; echo "Model $m failed, trying next fallback..."; done; exit 1'
+  --body 'node "$FACTORY_REPO_ROOT/factory/scripts/run-gemini-fallback.mjs"'
+```
+
+To customize the model fallback order, pass `--models`:
+```bash
+gh variable set FACTORY_AGENT_CMD \
+  --body 'node "$FACTORY_REPO_ROOT/factory/scripts/run-gemini-fallback.mjs" --models gemini-3.8-flash,gemini-3-flash-preview,gemini-2.5-flash,gemini-2.5-flash-lite'
 ```
 
 ### Add Model / CLI Authentication Secrets
