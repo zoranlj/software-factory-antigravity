@@ -12,6 +12,9 @@ Thumbs.db
 !/factory/jobs/.gitkeep
 /factory/worktrees/
 
-# Scratch & logs
+# Scratch, logs & local secrets
 /scratch/
 *.log
+.env
+.env.*
+!.env.example
